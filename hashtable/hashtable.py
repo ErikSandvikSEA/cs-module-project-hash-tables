@@ -2,6 +2,7 @@ class HashTableEntry:
     """
     Linked List hash table key/value pair
     """
+
     def __init__(self, key, value):
         self.key = key
         self.value = value
@@ -10,6 +11,49 @@ class HashTableEntry:
 
 # Hash table can't have fewer than this many slots
 MIN_CAPACITY = 8
+
+
+class LinkedList:
+    def __init__(self):
+        self.head = None
+
+    def get_val(self, val):
+        cur = self.head
+        while cur is not None:
+            if cur.value == val:
+                return cur
+            cur = cur.next
+
+        return None
+
+    def get_key(self, key):
+        cur = self.head
+        while cur is not None:
+            if cur.key == key:
+                return cur
+            cur = cur.next
+
+        return None
+
+    def insert_at_head(self, node):
+        node.next = self.head
+        self.head = node
+
+    def delete(self, key):
+        if self.head.key == key:
+            old_head = self.head
+            self.head = self.head.next
+            return old_head
+        prev = self.head
+        cur = prev.next
+
+        while cur is not None:
+            if cur.key == key:
+                prev.next = cur.next
+                return cur
+
+            prev = prev.next
+            cur = cur.next
 
 
 class HashTable:
@@ -22,7 +66,9 @@ class HashTable:
 
     def __init__(self, capacity):
         # Your code here
-
+        self.capacity = capacity
+        self.hash_data = [None] * self.capacity
+        self.element_count = 0
 
     def get_num_slots(self):
         """
@@ -35,7 +81,7 @@ class HashTable:
         Implement this.
         """
         # Your code here
-
+        return len(self.hash_data)
 
     def get_load_factor(self):
         """
@@ -44,7 +90,7 @@ class HashTable:
         Implement this.
         """
         # Your code here
-
+        return self.element_count / self.capacity
 
     def fnv1(self, key):
         """
@@ -55,7 +101,6 @@ class HashTable:
 
         # Your code here
 
-
     def djb2(self, key):
         """
         DJB2 hash, 32-bit
@@ -63,14 +108,17 @@ class HashTable:
         Implement this, and/or FNV-1.
         """
         # Your code here
-
+        hash = 5381
+        for x in key:
+            hash = ((hash << 5) + hash) + ord(x)
+        return hash & 0xFFFFFFFF
 
     def hash_index(self, key):
         """
         Take an arbitrary key and return a valid integer index
         between within the storage capacity of the hash table.
         """
-        #return self.fnv1(key) % self.capacity
+        # return self.fnv1(key) % self.capacity
         return self.djb2(key) % self.capacity
 
     def put(self, key, value):
@@ -81,8 +129,38 @@ class HashTable:
 
         Implement this.
         """
-        # Your code here
 
+        # NAIVE WAY --------------------------------------
+        # index = self.hash_index(key)
+        # self.hash_data[index] = value
+        # self.element_count += 1
+
+        # Way that handles collisions ---------------------------------
+        # if the index place is empty - we can just add a new linkedList with this node as the head
+        index = self.hash_index(key)
+        if self.hash_data[index] is None:
+            new_list = LinkedList()
+            new_list.insert_at_head(HashTableEntry(key, value))
+            # then add the newly-generated LindedList to the index spot just like the naive way
+            self.hash_data[index] = new_list
+        else:  # if there is some data in the index place, we need to either overwrite or add to the head
+            # check to see if the key already exists in the linkedlist or not
+            if self.hash_data[index].get_key(key) is None:
+                # if the key doesn't exist already, add a new entry to the head of the linked list
+                new_entry = HashTableEntry(key, value)
+                self.hash_data[index].insert_at_head(new_entry)
+            # if the key already exists, we need to overwrite the value to the new value
+            else:
+                current = self.hash_data[index].head
+                while current:
+                    if current.key == key:
+                        current.value = value
+                    current = current.next
+            self.element_count += 1
+
+            # resize if the load factor grows to above 0.7
+            if self.get_load_factor() >= 0.7:
+                self.resize(self.capacity * 2)
 
     def delete(self, key):
         """
@@ -93,7 +171,17 @@ class HashTable:
         Implement this.
         """
         # Your code here
+        index = self.hash_index(key)
+        if self.hash_data[index] is None:
+            print("Key not found")
+            return None
+        else:
+            self.element_count -= 1
+            self.hash_data[index].delete(key)
 
+        # resize if the load factory is under 0.2
+        if self.get_load_factor() < 0.2 and self.capacity >= 16:
+            self.resize(self.capacity // 2)
 
     def get(self, key):
         """
@@ -104,7 +192,13 @@ class HashTable:
         Implement this.
         """
         # Your code here
+        index = self.hash_index(key)
+        if self.hash_data[index].get_key(key):
+            lookup = self.hash_data[index].get_key(key)
+            return lookup.value
 
+        else:
+            return None
 
     def resize(self, new_capacity):
         """
@@ -112,9 +206,24 @@ class HashTable:
         rehashes all key/value pairs.
 
         Implement this.
-        """
-        # Your code here
+"""
 
+        # establish a new hash table
+        prev = self.hash_data
+        self.capacity = new_capacity
+        self.hash_data = [None] * self.capacity
+
+        # reset element_count
+        self.element_count = 0
+
+        # then pass in all of the data that we already had
+        for elem in prev:
+            if elem:
+                current = elem.head
+                while current:
+                    self.put(current.key, current.value)
+                    # then move onto the next one
+                    current = current.next
 
 
 if __name__ == "__main__":
